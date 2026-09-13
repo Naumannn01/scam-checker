@@ -31,9 +31,26 @@ class CheckedEntry(Base):
     updated_at = Column(DateTime(timezone=True), onupdate=func.now())
 
 class BlocklistEntry(Base):
+
     __tablename__ = "blocklist_entries"
 
     id = Column(Integer, primary_key=True, index=True)
     url = Column(String, unique=True, index=True, nullable=False)
     source = Column(String, default="openphish")
     added_at = Column(DateTime(timezone=True), server_default=func.now())
+
+class ReportStatus(str, enum.Enum):
+    pending = "pending"
+    approved = "approved"
+    rejected = "rejected"
+
+class Report(Base):
+    __tablename__ = "reports"
+
+    id = Column(Integer, primary_key=True, index=True)
+    reported_value = Column(String, nullable=False, index=True)
+    input_type = Column(Enum(InputType), nullable=False)
+    reporter_note = Column(String, nullable=True)
+    status = Column(Enum(ReportStatus), default=ReportStatus.pending)
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
+    reviewed_at = Column(DateTime(timezone=True), nullable=True)
