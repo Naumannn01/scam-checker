@@ -36,7 +36,6 @@ def check_domain_whois(entry_id: int, message_text: str = None):
         details = dict(entry.details or {})
         score = 0.0
 
-        # --- URL enrichment (only for url type) ---
         if entry.input_type == InputType.url:
             domain = extract_domain(entry.input_value)
 
@@ -80,9 +79,6 @@ def check_domain_whois(entry_id: int, message_text: str = None):
             if any(domain_lower.endswith(tld) for tld in suspicious_tlds):
                 score += 0.15
 
-            # check against cached blocklist — substring pre-filter (fast),
-            # then verify EXACT host match to avoid false positives like
-            # "sites.google.com/..." matching "google.com"
             candidates = db.query(BlocklistEntry).filter(
                 BlocklistEntry.url.ilike(f"%{domain}%")
             ).all()
@@ -97,7 +93,6 @@ def check_domain_whois(entry_id: int, message_text: str = None):
                 details["blocklist_source"] = blocklist_hit.source
                 score += 0.6
 
-        # --- Message urgency/sentiment (any input type) ---
         if message_text:
             msg_analysis = analyze_message(message_text)
             details["message_analysis"] = msg_analysis
@@ -124,8 +119,16 @@ def check_domain_whois(entry_id: int, message_text: str = None):
         db.close()
 
 
-@celery_app.task(name="app.tasks.refresh_blocklist")
-def refresh_blocklist():
+@celery_app.task(
+    name="app.tasks.refresh_blocklist",
+    bind=True,
+    autoretry_for=(requests.exceptions.RequestException,),
+    retry_backoff=True,
+    retry_backoff_max=600,
+    retry_jitter=True,
+    max_retries=3,
+)
+def refresh_blocklist(self):
     db = SessionLocal()
     try:
         resp = requests.get("https://openphish.com/feed.txt", timeout=30)
@@ -142,7 +145,7 @@ def refresh_blocklist():
         db.commit()
         return {"total_fetched": len(urls), "new_added": added}
 
-    except Exception as e:
-        return {"error": str(e)}
+    except requests.exceptions.RequestException:
+        raise
     finally:
         db.close()
