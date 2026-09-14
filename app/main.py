@@ -1,14 +1,21 @@
 from fastapi import FastAPI
-from slowapi import Limiter, _rate_limit_exceeded_handler
-from slowapi.util import get_remote_address
+from fastapi.middleware.cors import CORSMiddleware
+from slowapi import _rate_limit_exceeded_handler
 from slowapi.errors import RateLimitExceeded
-from app.limiter import limiter
 
+from app.limiter import limiter
 from app.routers import check, report
 
-limiter = Limiter(key_func=get_remote_address)
-
 app = FastAPI(title="Scam URL/UPI Reputation Checker")
+
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["http://localhost:5173", "http://localhost:5174"],
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
+
 app.state.limiter = limiter
 app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
 
@@ -18,4 +25,3 @@ app.include_router(report.router)
 @app.get("/health")
 def health_check():
     return {"status": "ok"}
-
