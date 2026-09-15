@@ -47,6 +47,7 @@ Anyone can report a suspicious URL, UPI ID, or phone number. Reports are held fo
 
 The Scam Checker follows an asynchronous processing architecture using FastAPI, Celery, and a frontend polling mechanism.
 
+```text
 User submits a check
         │
         ▼
@@ -81,6 +82,7 @@ Frontend polls GET /check/{id}
         │
         ▼
 Display the final result
+```
 
 A separate Celery Beat schedule refreshes the OpenPhish blocklist every 6 hours, with automatic retry and exponential backoff on transient network failures.
 
