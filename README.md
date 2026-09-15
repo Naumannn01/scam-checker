@@ -44,3 +44,94 @@ Anyone can report a suspicious URL, UPI ID, or phone number. Reports are held fo
 - Live polling UI — since scoring runs asynchronously, the frontend polls for the result and shows a loading state until the verdict is ready
 
 ## Architecture
+
+The Scam Checker follows an asynchronous processing architecture using FastAPI, Celery, and a frontend polling mechanism.
+
+User submits a check
+        │
+        ▼
+FastAPI creates a database row
+        │
+        │  verdict: "unknown"
+        ▼
+Celery processes the task in the background
+        │
+        ├── WHOIS Lookup
+        │     ├── Domain age analysis
+        │     ├── TLD scoring
+        │     └── Keyword scoring
+        │
+        ├── Blocklist Cross-Reference
+        │     └── Exact host match
+        │
+        ├── Message Analysis (if provided)
+        │     └── Urgency / Sentiment analysis
+        │
+        ▼
+Combine all signals
+        │
+        ▼
+Calculate final risk score
+        │
+        ▼
+Generate final verdict
+        │
+        ▼
+Frontend polls GET /check/{id}
+        │
+        ▼
+Display the final result
+
+A separate Celery Beat schedule refreshes the OpenPhish blocklist every 6 hours, with automatic retry and exponential backoff on transient network failures.
+
+## API overview
+
+| Endpoint | Description |
+|---|---|
+| `POST /check` | Submit a URL, UPI ID, or phone number for scoring |
+| `GET /check/{id}` | Get the result of a check |
+| `POST /check/{id}/recheck` | Force a fresh re-score of an existing entry |
+| `GET /check/history` | List past checks, filterable by verdict, input type, and score range |
+| `POST /report` | Publicly submit a report for a suspected scam |
+| `GET /report/pending` | *(admin)* List reports awaiting review |
+| `POST /report/{id}/approve` | *(admin)* Approve a report — adds it to the live blocklist |
+| `POST /report/{id}/reject` | *(admin)* Reject a report |
+
+`POST /check` is rate-limited to 10 requests per minute per IP. Admin endpoints require an `X-Admin-Key` header.
+
+## Running it locally
+
+**Backend:**
+```bash
+docker-compose up -d          # Postgres + Redis
+python -m venv venv
+venv\Scripts\activate         # Windows
+pip install -r requirements.txt
+alembic upgrade head
+uvicorn app.main:app --reload
+```
+
+In a separate terminal:
+```bash
+celery -A app.celery_app worker --loglevel=info --pool=solo
+```
+
+**Frontend:**
+```bash
+cd frontend
+npm install
+npm run dev
+```
+
+Visit `http://localhost:5173`.
+
+## Roadmap
+
+- [ ] UPI ID and phone number scoring (pending dedicated research/data)
+- [ ] Automated test suite (backend + frontend)
+- [ ] Input validation hardening
+- [ ] Production deployment
+
+## Motivation
+
+Built as a step toward real-time, citizen-level cyber incident response tooling — the kind of infrastructure that's largely missing for everyday scam and phishing threats in India today.
