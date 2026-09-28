@@ -8,6 +8,7 @@ __pycache__/
 build/
 dist/
 *.egg-info/
+.pytest_cache/
 
 # Celery
 celerybeat-schedule
@@ -31,3 +32,4 @@ frontend/.vite/
 # OS
 .DS_Store
 Thumbs.db
+
