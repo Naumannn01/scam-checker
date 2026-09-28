@@ -50,3 +50,7 @@ def test_reject_does_not_touch_blocklist(client, db_session):
 
 def test_approve_unknown_report_404(client):
     assert client.post("/report/9999/approve", headers=ADMIN).status_code == 404
+
+def test_report_rejects_garbage_input(client):
+    r = client.post("/report", json={"reported_value": "hello world"})
+    assert r.status_code == 422

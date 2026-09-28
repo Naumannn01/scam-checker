@@ -11,21 +11,26 @@ from app.limiter import limiter
 
 router = APIRouter(prefix="/check", tags=["check"])
 
-
 @router.post("", response_model=CheckResponse)
 @limiter.limit("10/minute")
 def create_check(request: Request, body: CheckRequest, db: Session = Depends(get_db)):
-    input_type = classify_input(body.input_value)
+    value = body.input_value.strip()
+    input_type = classify_input(value)
+    if input_type is None:
+        raise HTTPException(
+            status_code=422,
+            detail="Enter a valid URL, UPI ID, or Indian mobile number.",
+        )
 
     existing = db.query(CheckedEntry).filter(
-        CheckedEntry.input_value == body.input_value
+        CheckedEntry.input_value == value
     ).first()
 
     if existing:
         return existing
 
     entry = CheckedEntry(
-        input_value=body.input_value,
+        input_value=value,
         input_type=InputType(input_type),
         verdict=Verdict.unknown,
         risk_score=0.0,
@@ -40,7 +45,6 @@ def create_check(request: Request, body: CheckRequest, db: Session = Depends(get
         check_domain_whois.delay(entry.id, body.message_text)
 
     return entry
-
 
 @router.get("/history", response_model=List[CheckResponse])
 def get_history(

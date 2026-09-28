@@ -19,10 +19,16 @@ def verify_admin(x_admin_key: Optional[str] = Header(None)):
 
 @router.post("", response_model=ReportResponse)
 def create_report(request: ReportRequest, db: Session = Depends(get_db)):
-    input_type = classify_input(request.reported_value)
+    value = request.reported_value.strip()
+    input_type = classify_input(value)
+    if input_type is None:
+        raise HTTPException(
+            status_code=422,
+            detail="Enter a valid URL, UPI ID, or Indian mobile number.",
+        )
 
     report = Report(
-        reported_value=request.reported_value,
+        reported_value=value,
         input_type=input_type,
         reporter_note=request.reporter_note,
         status=ReportStatus.pending,
@@ -31,7 +37,6 @@ def create_report(request: ReportRequest, db: Session = Depends(get_db)):
     db.commit()
     db.refresh(report)
     return report
-
 
 @router.get("/pending", response_model=List[ReportResponse])
 def list_pending_reports(db: Session = Depends(get_db), _: None = Depends(verify_admin)):

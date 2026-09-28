@@ -24,3 +24,18 @@ def test_upi_without_message_does_not_queue_task(client, mock_task):
     r = client.post("/check", json={"input_value": "scammer@ybl"})
     assert r.json()["input_type"] == "upi"
     mock_task.delay.assert_not_called()
+
+def test_check_rejects_garbage_input(client, mock_task):
+    r = client.post("/check", json={"input_value": "hello world"})
+    assert r.status_code == 422
+    mock_task.delay.assert_not_called()
+
+
+def test_check_rejects_blank_input(client):
+    assert client.post("/check", json={"input_value": "   "}).status_code == 422
+
+
+def test_check_strips_whitespace_before_storing(client):
+    r = client.post("/check", json={"input_value": "  google.com  "})
+    assert r.status_code == 200
+    assert r.json()["input_value"] == "google.com"
