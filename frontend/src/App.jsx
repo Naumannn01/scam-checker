@@ -35,6 +35,8 @@ export default function App() {
       setLoading(false)
       if (err.response?.status === 429) {
         alert('Too many checks — please wait a minute and try again.')
+      } else if (err.response?.status === 422 && typeof err.response.data?.detail === 'string') {
+        alert(err.response.data.detail)
       } else {
         alert('Something went wrong. Please try again.')
       }
