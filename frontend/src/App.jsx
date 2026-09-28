@@ -72,7 +72,8 @@ export default function App() {
     <div className="min-h-screen bg-slate-900 text-slate-100">
       <div className="max-w-xl mx-auto px-4 py-10">
         <div className="mb-6">
-          <div className="flex items-center justify-between mb-2">
+                    <div className="flex items-center gap-2 mb-2">
+            <img src="/logo.svg" alt="" className="w-6 h-6" />
             <h1 className="text-base font-medium">Scam checker</h1>
           </div>
           <p className="text-sm text-slate-400 mb-1 leading-relaxed">
