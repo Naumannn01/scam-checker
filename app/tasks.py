@@ -2,7 +2,7 @@ import whois
 import requests
 from datetime import datetime, timezone
 from urllib.parse import urlparse
-
+from app.config import settings
 from app.celery_app import celery_app
 from app.database import SessionLocal
 from app.models import CheckedEntry, Verdict, InputType, BlocklistEntry
@@ -24,6 +24,29 @@ def extract_host(url: str) -> str:
         url = "http://" + url
     return urlparse(url).netloc.lower()
 
+def check_safe_browsing(url: str) -> bool:
+    """Query Google Safe Browsing's Lookup API for a single URL. Returns True on a match."""
+    api_url = "https://safebrowsing.googleapis.com/v4/threatMatches:find"
+    payload = {
+        "client": {"clientId": "scam-checker", "clientVersion": "1.0"},
+        "threatInfo": {
+            "threatTypes": [
+                "MALWARE", "SOCIAL_ENGINEERING", "UNWANTED_SOFTWARE", "POTENTIALLY_HARMFUL_APPLICATION",
+            ],
+            "platformTypes": ["ANY_PLATFORM"],
+            "threatEntryTypes": ["URL"],
+            "threatEntries": [{"url": url}],
+        },
+    }
+    resp = requests.post(
+        api_url,
+        params={"key": settings.safe_browsing_api_key},
+        json=payload,
+        timeout=10,
+    )
+    resp.raise_for_status()
+    matches = resp.json().get("matches", [])
+    return len(matches) > 0
 
 @celery_app.task(name="app.tasks.check_domain_whois")
 def check_domain_whois(entry_id: int, message_text: str = None):
@@ -93,6 +116,17 @@ def check_domain_whois(entry_id: int, message_text: str = None):
                 details["blocklist_source"] = blocklist_hit.source
                 score += 0.6
 
+            # Google Safe Browsing — a second, independently-maintained live source
+            try:
+                sb_hit = check_safe_browsing(entry.input_value)
+            except Exception as e:
+                sb_hit = False
+                details["safe_browsing_error"] = str(e)
+
+            details["safe_browsing_hit"] = sb_hit
+            if sb_hit:
+                score += 0.6
+
         if message_text:
             msg_analysis = analyze_message(message_text)
             details["message_analysis"] = msg_analysis
@@ -101,6 +135,9 @@ def check_domain_whois(entry_id: int, message_text: str = None):
         score = min(score, 1.0)
 
         if details.get("blocklist_hit"):
+            score = max(score, 0.9)
+
+        if details.get("safe_browsing_hit"):
             score = max(score, 0.9)
 
         if score >= 0.7:

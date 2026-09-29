@@ -180,3 +180,15 @@ def test_score_is_capped_at_one(run, monkeypatch):
 def test_unknown_entry_id_returns_quietly(db_session, monkeypatch):
     monkeypatch.setattr("app.tasks.SessionLocal", lambda: db_session)
     assert check_domain_whois(9999) is None
+
+def test_safe_browsing_failure_does_not_crash_task(run, monkeypatch):
+    fake_whois(monkeypatch, creation_date=days_ago(10000))
+
+    def broken_safe_browsing(url):
+        raise Exception("Safe Browsing API unavailable")
+
+    monkeypatch.setattr("app.tasks.check_safe_browsing", broken_safe_browsing)
+    entry = run("google.com")
+    assert entry.verdict == Verdict.safe
+    assert entry.details["safe_browsing_hit"] is False
+    assert "Safe Browsing API unavailable" in entry.details["safe_browsing_error"]

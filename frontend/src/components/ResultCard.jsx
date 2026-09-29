@@ -6,6 +6,9 @@ function explainDetails(details) {
   if (details.blocklist_hit) {
     reasons.push(`Matches a known phishing URL (source: ${details.blocklist_source})`)
   }
+  if (details.safe_browsing_hit) {
+    reasons.push('Flagged by Google Safe Browsing')
+  }
   if (details.domain_age_days !== undefined && details.domain_age_days !== null) {
     reasons.push(`Domain registered ${details.domain_age_days} days ago`)
   } else if (details.whois_error) {
@@ -21,7 +24,7 @@ function explainDetails(details) {
     }
   }
   if (reasons.length === 0) {
-    reasons.push('No suspicious patterns detected')
+    reasons.push('No known risk signals in our current data. This does not guarantee the site is legitimate.')
   }
   return reasons
 }
